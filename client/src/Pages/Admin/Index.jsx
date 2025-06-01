@@ -152,13 +152,6 @@ function Admin() {
                     >
                         {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
                     </button>
-
-                    <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
-                        <Space style={{ cursor: 'pointer' }}>
-                            <Avatar icon={<UserOutlined />} />
-                            <span>Admin</span>
-                        </Space>
-                    </Dropdown>
                 </Header>
                 <Content className={cx('content')}>{renderContent()}</Content>
             </Layout>
