@@ -3,15 +3,27 @@ import styles from './ForgotPassword.module.scss';
 import Header from '../../Components/Header/Header';
 import { Form, Input, Button, message } from 'antd';
 import { MailOutlined, LockOutlined, KeyOutlined } from '@ant-design/icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Footer from '../../Components/Footer/Footer';
 import { requestForgotPassword, requestResetPassword } from '../../config/request';
+import { useNavigate } from 'react-router-dom';
+
+import Cookies from 'js-cookie';
 
 const cx = classNames.bind(styles);
 
 function ForgotPassword() {
     const [isEmailSent, setIsEmailSent] = useState(false);
     const [form] = Form.useForm();
+
+    useEffect(() => {
+        const token = Cookies.get('tokenResetPassword');
+        if (token) {
+            setIsEmailSent(true);
+        }
+    }, []);
+
+    const navigate = useNavigate();
 
     const handleSendEmail = async (values) => {
         try {
