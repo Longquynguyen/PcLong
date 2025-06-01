@@ -4,8 +4,9 @@ const modelProduct = require('../models/products.model');
 const modelPayment = require('../models/payments.model');
 const modelUserWatch = require('../models/userWatchProduct.model');
 const modelOtp = require('../models/otp.model');
+const modelCategory = require('../models/category.model');
 
-const { Op } = require('sequelize');
+const { Op, Sequelize } = require('sequelize');
 
 const { BadUserRequestError } = require('../core/error.response');
 const { OK } = require('../core/success.response');
@@ -30,7 +31,7 @@ class controllerUser {
         const findUser = await modelUser.findOne({ where: { email } });
 
         if (findUser) {
-            throw new BadUserRequestError('Email đã tồn tại');
+            return res.status(400).json({ message: 'Email đã tồn tại' });
         }
 
         const saltRounds = 10;
@@ -85,12 +86,15 @@ class controllerUser {
             throw new BadUserRequestError('Vui lòng nhập đầy đủ thông tin');
         }
         const findUser = await modelUser.findOne({ where: { email } });
+        if (findUser.typeLogin === 'google') {
+            return res.status(400).json({ message: 'Tài khoản đăng nhập bằng Google' });
+        }
         if (!findUser) {
-            throw new BadUserRequestError('Tài khoản hoặc mật khẩu không chính xác');
+            return res.status(400).json({ message: 'Tài khoản hoặc mật khẩu không chính xác' });
         }
         const isPasswordValid = bcrypt.compareSync(password, findUser.password);
         if (!isPasswordValid) {
-            throw new BadUserRequestError('Tài khoản hoặc mật khẩu không chính xác');
+            return res.status(400).json({ message: 'Tài khoản hoặc mật khẩu không chính xác' });
         }
         await createApiKey(findUser.id);
         const token = await createToken({ id: findUser.id, isAdmin: findUser.isAdmin });
@@ -192,21 +196,38 @@ class controllerUser {
 
     async getDashboardStats(req, res) {
         try {
-            // 1. Lấy thống kê cơ bản
-            const totalUsers = await modelUser.count();
-            const totalProducts = await modelProduct.count();
-            const totalWatching = await modelUserWatch.count();
+            const { startDate, endDate } = req.query;
+
+            let whereClause = {};
+            if (startDate && endDate) {
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                whereClause = {
+                    createdAt: {
+                        [Op.between]: [start, end],
+                    },
+                };
+            }
+
+            // 1. Lấy thống kê cơ bản (lọc theo ngày)
+            const totalUsers = await modelUser.count({ where: whereClause });
+            const totalProducts = await modelProduct.count({ where: whereClause });
+            const totalWatching = await modelUserWatch.count({ where: whereClause });
 
             // Tính tổng doanh thu từ các đơn hàng completed
             const totalRevenue = await modelPayment.sum('totalPrice', {
                 where: {
                     status: 'delivered',
+                    ...whereClause,
                 },
             });
 
             // 2. Lấy đơn hàng gần đây (5 đơn hàng mới nhất)
             const recentOrders = await modelPayment.findAll({
                 attributes: ['id', 'idPayment', 'fullName', 'totalPrice', 'status', 'typePayment', 'createdAt'],
+                where: whereClause,
                 order: [['createdAt', 'DESC']],
                 limit: 5,
             });
@@ -220,6 +241,7 @@ class controllerUser {
                 ],
                 where: {
                     status: 'delivered',
+                    ...whereClause,
                 },
                 group: ['productId'],
                 order: [[modelPayment.sequelize.fn('SUM', modelPayment.sequelize.col('quantity')), 'DESC']],
@@ -238,13 +260,24 @@ class controllerUser {
             });
 
             // Map số lượng bán vào thông tin sản phẩm
-            const topProductsWithSales = topProducts.map((product) => {
+            const topProductsPromises = topProducts.map(async (product) => {
                 const sale = productSales.find((s) => s.productId === product.id);
+                const test = await modelPayment.findAll({
+                    where: {
+                        productId: product.id,
+                        ...whereClause,
+                    },
+                });
+
                 return {
                     ...product.toJSON(),
                     totalSold: sale ? parseInt(sale.getDataValue('totalSold')) : 0,
+                    quantity: test[0]?.quantity || 0, // Thêm optional chaining để tránh lỗi
                 };
             });
+
+            // Đợi tất cả Promise resolve
+            const topProductsWithSales = await Promise.all(topProductsPromises);
 
             // Trả về tất cả dữ liệu
             new OK({
@@ -335,24 +368,34 @@ class controllerUser {
             const { Op } = require('sequelize');
             const modelPayment = require('../models/payments.model');
 
-            // Get the current date
-            const today = new Date();
-            today.setHours(23, 59, 59, 999);
+            // Lấy startDate và endDate từ query params
+            let { startDate, endDate } = req.query;
 
-            // Get date 7 days ago
-            const sevenDaysAgo = new Date();
-            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-            sevenDaysAgo.setHours(0, 0, 0, 0);
-
-            // Generate an array of dates for the last 7 days
-            const dateArray = [];
-            for (let i = 0; i < 7; i++) {
-                const date = new Date(sevenDaysAgo);
-                date.setDate(date.getDate() + i);
-                dateArray.push(date);
+            let start, end;
+            if (startDate && endDate) {
+                // Nếu có truyền startDate và endDate
+                start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+            } else {
+                // Nếu không truyền, mặc định lấy 7 ngày gần nhất
+                end = new Date();
+                end.setHours(23, 59, 59, 999);
+                start = new Date();
+                start.setDate(start.getDate() - 6);
+                start.setHours(0, 0, 0, 0);
             }
 
-            // Get orders for the last 7 days
+            // Tạo mảng ngày từ start đến end
+            const dateArray = [];
+            const current = new Date(start);
+            while (current <= end) {
+                dateArray.push(new Date(current));
+                current.setDate(current.getDate() + 1);
+            }
+
+            // Lấy đơn hàng trong khoảng ngày
             const orders = await modelPayment.findAll({
                 attributes: [
                     [modelPayment.sequelize.fn('DATE', modelPayment.sequelize.col('createdAt')), 'date'],
@@ -360,14 +403,14 @@ class controllerUser {
                 ],
                 where: {
                     createdAt: {
-                        [Op.between]: [sevenDaysAgo, today],
+                        [Op.between]: [start, end],
                     },
                 },
                 group: [modelPayment.sequelize.fn('DATE', modelPayment.sequelize.col('createdAt'))],
                 order: [[modelPayment.sequelize.fn('DATE', modelPayment.sequelize.col('createdAt')), 'ASC']],
             });
 
-            // Format the results with all 7 days, including days with zero orders
+            // Format kết quả với tất cả các ngày, kể cả ngày không có đơn hàng
             const formattedResults = dateArray.map((date) => {
                 const dateStr = date.toISOString().split('T')[0];
                 const orderData = orders.find((order) => order.getDataValue('date') === dateStr);
@@ -494,6 +537,58 @@ class controllerUser {
         findUser.isAdmin = role;
         await findUser.save();
         new OK({ message: 'Cập nhật quyền người dùng thành công' }).send(res);
+    }
+
+    async getBieuDoTron(req, res) {
+        try {
+            // Get category distribution
+            const categoryStats = await modelProduct.findAll({
+                attributes: ['componentType', [Sequelize.fn('COUNT', Sequelize.col('id')), 'value']],
+                group: ['componentType'],
+                raw: true,
+            });
+
+            // Get order status distribution
+            const orderStats = await modelPayment.findAll({
+                attributes: ['status', [Sequelize.fn('COUNT', Sequelize.col('id')), 'value']],
+                where: {
+                    status: ['delivered', 'cancelled'],
+                },
+                group: ['status'],
+                raw: true,
+            });
+
+            // Transform order status data
+            const transformedOrderStats = orderStats.map((stat) => ({
+                status: stat.status === 'delivered' ? 'Hoàn thành' : 'Đã huỷ',
+                value: parseInt(stat.value),
+            }));
+
+            // Transform category data with proper Vietnamese names
+            const categoryNames = {
+                pc: 'Máy tính',
+                vga: 'Card đồ họa',
+                cpu: 'CPU',
+                ram: 'RAM',
+                ssd: 'Ổ cứng',
+            };
+
+            const transformedCategoryStats = categoryStats.map((stat) => ({
+                type: categoryNames[stat.componentType] || stat.componentType.toUpperCase(),
+                value: parseInt(stat.value),
+            }));
+
+            new OK({
+                message: 'Get pie chart data successfully',
+                metadata: {
+                    categoryStats: transformedCategoryStats,
+                    orderStats: transformedOrderStats,
+                },
+            }).send(res);
+        } catch (error) {
+            console.error('Error getting pie chart data:', error);
+            throw error;
+        }
     }
 }
 
