@@ -8,7 +8,14 @@ const modelProduct = require('../models/products.model');
 async function askQuestion(question) {
     try {
         const products = await modelProduct.findAll({});
-        const productData = products.map((product) => `Tên ${product.name}, Giá : ${product.price}`).join('\n');
+        const productData = products
+            .map(
+                (product) =>
+                    `Tên ${product.name}, Giá gốc ${product.price}, Giá khuyến mại : ${
+                        product.discount > 0 ? product.price - (product.price * product.discount) / 100 : product.price
+                    }, Giảm: ${product.discount}`
+            )
+            .join('\n');
 
         const prompt = `
          Bạn là một trợ lý bán hàng chuyên nghiệp. 
