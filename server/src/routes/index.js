@@ -35,6 +35,7 @@ function routes(app) {
     app.post('/api/forgot-password', userRoutes);
     app.post('/api/reset-password', userRoutes);
     app.post('/api/update-role-user', userRoutes);
+    app.get('/api/users/pie-chart', userRoutes);
 
     ///// product
     app.post('/api/create-product', productRoutes);
