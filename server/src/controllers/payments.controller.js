@@ -11,6 +11,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 const { VNPay, ignoreLogger, ProductCode, VnpLocale, dateFormat } = require('vnpay');
+const { log } = require('util');
 
 function generatePayID() {
     // Tạo ID thanh toán bao gồm cả giây để tránh trùng lặp
@@ -357,14 +358,6 @@ class PaymentsController {
                         quantity: orderData.quantity,
                     });
                 }
-            }
-
-            // Cập nhật tổng tiền cho từng đơn hàng sau khi đã thêm tất cả sản phẩm
-            for (const idPayment in groupedOrders) {
-                groupedOrders[idPayment].totalPrice = groupedOrders[idPayment].products.reduce(
-                    (total, product) => total + product.price * product.quantity,
-                    0,
-                );
             }
 
             // Chuyển đổi object thành array để trả về
