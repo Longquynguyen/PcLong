@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Table, Typography, Tag, Spin } from 'antd';
+import { Card, Row, Col, Statistic, Table, Typography, Tag, Spin, DatePicker } from 'antd';
 import { UserOutlined, ShoppingCartOutlined, DollarOutlined, EyeOutlined } from '@ant-design/icons';
-import { Column } from '@ant-design/charts';
+import { Column, Pie } from '@ant-design/charts';
 import styles from './DashBoard.module.scss';
 import classNames from 'classnames/bind';
 import { requestDashboard, requestGetOrderStats } from '../../../../config/request';
+import axios from 'axios';
 
 const { Title } = Typography;
 const cx = classNames.bind(styles);
@@ -20,11 +21,18 @@ function DashBoard() {
     const [recentOrders, setRecentOrders] = useState([]);
     const [topProducts, setTopProducts] = useState([]);
     const [orderStats, setOrderStats] = useState([]);
+    const [categoryStats, setCategoryStats] = useState([]);
+    const [orderStatusStats, setOrderStatusStats] = useState([]);
+    const [startDate, setStartDate] = useState(null);
+    const [endDate, setEndDate] = useState(null);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                const response = await requestDashboard();
+                const params = {};
+                if (startDate) params.startDate = startDate.format('YYYY-MM-DD');
+                if (endDate) params.endDate = endDate.format('YYYY-MM-DD');
+                const response = await requestDashboard(params);
                 const {
                     statistics: statsData,
                     recentOrders: ordersData,
@@ -53,16 +61,31 @@ function DashBoard() {
 
         const fetchOrderStats = async () => {
             try {
-                const response = await requestGetOrderStats();
+                const params = {};
+                if (startDate) params.startDate = startDate.format('YYYY-MM-DD');
+                if (endDate) params.endDate = endDate.format('YYYY-MM-DD');
+                const response = await requestGetOrderStats(params);
                 setOrderStats(response.metadata);
             } catch (error) {
                 console.error('Error fetching order statistics:', error);
             }
         };
 
+        const fetchPieChartData = async () => {
+            try {
+                const response = await axios.get('http://localhost:3000/api/users/pie-chart');
+                const { categoryStats, orderStats } = response.data.metadata;
+                setCategoryStats(categoryStats);
+                setOrderStatusStats(orderStats);
+            } catch (error) {
+                console.error('Error fetching pie chart data:', error);
+            }
+        };
+
         fetchDashboardData();
         fetchOrderStats();
-    }, []);
+        fetchPieChartData();
+    }, [startDate, endDate]);
 
     const orderColumns = [
         {
@@ -86,11 +109,24 @@ function DashBoard() {
             title: 'Trạng thái',
             dataIndex: 'status',
             key: 'status',
-            render: (status) => (
-                <Tag color={status === 'completed' ? 'green' : 'orange'}>
-                    {status === 'completed' ? 'Hoàn thành' : 'Đang xử lý'}
-                </Tag>
-            ),
+            render: (status) => {
+                const getStatusConfig = (status) => {
+                    switch (status) {
+                        case 'pending':
+                            return { color: 'orange', text: 'Đang chờ xử lý' };
+                        case 'completed':
+                            return { color: 'green', text: 'Hoàn thành' };
+                        case 'delivered':
+                            return { color: 'blue', text: 'Đã giao' };
+                        case 'cancelled':
+                            return { color: 'red', text: 'Đã hủy' };
+                        default:
+                            return { color: 'default', text: 'Không xác định' };
+                    }
+                };
+                const { color, text } = getStatusConfig(status);
+                return <Tag color={color}>{text}</Tag>;
+            },
         },
         {
             title: 'Phương thức',
@@ -125,14 +161,20 @@ function DashBoard() {
                     ram: 'green',
                     ssd: 'orange',
                 };
-                return <Tag color={colors[type]}>{type.toUpperCase()}</Tag>;
+                return <Tag color={colors[type]}>{type?.toUpperCase()}</Tag>;
             },
+        },
+        {
+            title: 'Số lượng bán',
+            dataIndex: 'quantity',
+            key: 'quantity',
+            render: (quantity) => quantity,
         },
         {
             title: 'Giá',
             dataIndex: 'price',
             key: 'price',
-            render: (price) => `${price.toLocaleString('vi-VN')}đ`,
+            render: (price) => `${price?.toLocaleString('vi-VN')}đ`,
         },
         {
             title: 'Tồn kho',
@@ -167,6 +209,40 @@ function DashBoard() {
         },
     };
 
+    // Category pie chart configuration
+    const categoryConfig = {
+        data: categoryStats,
+        angleField: 'value',
+        colorField: 'type',
+        radius: 0.8,
+        label: {
+            type: 'spider',
+            content: '{name}: {percentage}',
+            style: {
+                fontSize: 14,
+            },
+        },
+        interactions: [{ type: 'element-active' }],
+        color: ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1'],
+    };
+
+    // Order status pie chart configuration
+    const orderStatusConfig = {
+        data: orderStatusStats,
+        angleField: 'value',
+        colorField: 'status',
+        radius: 0.8,
+        label: {
+            type: 'spider',
+            content: '{name}: {percentage}',
+            style: {
+                fontSize: 14,
+            },
+        },
+        interactions: [{ type: 'element-active' }],
+        color: ['#52c41a', '#ff4d4f'],
+    };
+
     if (loading) {
         return (
             <div className={cx('loading-container')}>
@@ -178,6 +254,15 @@ function DashBoard() {
     return (
         <div className={cx('wrapper')}>
             <Title level={2}>Tổng quan</Title>
+            <div style={{ marginBottom: 24 }}>
+                <DatePicker
+                    placeholder="Chọn ngày bắt đầu"
+                    onChange={setStartDate}
+                    style={{ marginRight: 8 }}
+                    value={startDate}
+                />
+                <DatePicker placeholder="Chọn ngày kết thúc" onChange={setEndDate} value={endDate} />
+            </div>
 
             {/* Thống kê */}
             <Row gutter={[16, 16]} className={cx('statistics')}>
@@ -220,8 +305,22 @@ function DashBoard() {
             {/* Biểu đồ đơn hàng 7 ngày gần đây */}
             <Row gutter={[16, 16]} className={cx('order-chart')}>
                 <Col xs={24}>
-                    <Card title="Đơn hàng trong 7 ngày gần đây">
+                    <Card title="Tổng quan đơn hàng">
                         <Column {...config} />
+                    </Card>
+                </Col>
+            </Row>
+
+            {/* Pie Charts */}
+            <Row gutter={[16, 16]} className={cx('pie-charts')}>
+                <Col xs={24} lg={12}>
+                    <Card title="Phân bố danh mục sản phẩm">
+                        <Pie {...categoryConfig} />
+                    </Card>
+                </Col>
+                <Col xs={24} lg={12}>
+                    <Card title="Trạng thái đơn hàng">
+                        <Pie {...orderStatusConfig} />
                     </Card>
                 </Col>
             </Row>
@@ -233,7 +332,7 @@ function DashBoard() {
                         <Table
                             columns={orderColumns}
                             dataSource={recentOrders}
-                            pagination={{ pageSize: 5 }}
+                            pagination={false}
                             scroll={{ x: true }}
                         />
                     </Card>
@@ -243,7 +342,7 @@ function DashBoard() {
                         <Table
                             columns={productColumns}
                             dataSource={topProducts}
-                            pagination={{ pageSize: 5 }}
+                            pagination={false}
                             scroll={{ x: true }}
                         />
                     </Card>
