@@ -2,7 +2,7 @@ import styles from './DetailProduct.module.scss';
 import classNames from 'classnames/bind';
 import Header from '../../Components/Header/Header';
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { requestAddToCart, requestCreateUserWatchProduct, requestGetProductById } from '../../config/request';
 import Footer from '../../Components/Footer/Footer';
 import { message, Rate } from 'antd';
@@ -22,7 +22,7 @@ function DetailProduct() {
 
     const { id } = useParams();
 
-    const { fetchCart } = useStore();
+    const { fetchCart, dataUser } = useStore();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -149,15 +149,22 @@ function DetailProduct() {
                             <button onClick={handleIncrement}>+</button>
                         </div>
                     </div>
-
-                    <div className={cx('action-buttons')}>
-                        <button onClick={onBuyNow} className={cx('buy-now')}>
-                            ĐẶT HÀNG
-                        </button>
-                        <button onClick={onAddToCart} className={cx('add-to-cart')}>
-                            THÊM VÀO GIỎ
-                        </button>
-                    </div>
+                    {dataUser.id ? (
+                        <div className={cx('action-buttons')}>
+                            <button onClick={onBuyNow} className={cx('buy-now')}>
+                                ĐẶT HÀNG
+                            </button>
+                            <button onClick={onAddToCart} className={cx('add-to-cart')}>
+                                THÊM VÀO GIỎ
+                            </button>
+                        </div>
+                    ) : (
+                        <div className={cx('action-buttons')}>
+                            <Link style={{ textDecoration: 'none', width: '100%', color: 'white' }} to="/login">
+                                <button className={cx('buy-now')}>Đăng nhập để mua hàng</button>
+                            </Link>
+                        </div>
+                    )}
                 </div>
             </div>
             <div className={cx('description')}>
