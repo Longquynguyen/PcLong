@@ -128,7 +128,7 @@ function Contact() {
                                         rules={[
                                             {
                                                 pattern: /^0\d{0,9}$/,
-                                                message: 'SĐT phải bắt đầu bằng số 0',
+                                                message: 'SĐT phải bắt đầu bằng số 0 và tối đa 10 số',
                                             },
                                             {
                                                 required: true,
@@ -336,13 +336,13 @@ function Contact() {
                                     </Paragraph>
                                     <Divider style={{ margin: '15px 0' }} />
                                     <Paragraph>
-                                        <Text strong>Tài khoản cá nhân - Ngân hàng MBMB BANK</Text>
+                                        <Text strong>Tài khoản cá nhân - Ngân hàng TP BANK</Text>
                                         <br />
-                                        STK: 03945886830394588683
+                                        STK: 0811 8889 999
                                         <br />
-                                        Ngân hàng: MB BANK
+                                        Ngân hàng: TP BANK
                                         <br />
-                                        Tên: NGUYEN QUY LONG
+                                        Tên: TRUONG THI NGUYET
                                     </Paragraph>
                                 </div>
 
@@ -353,7 +353,7 @@ function Contact() {
                                             <Space align="start">
                                                 <EnvironmentOutlined />
                                                 <Paragraph style={{ margin: 0 }}>
-                                                    83-85 Tân Hội , Đan Phượng, Hà Nội
+                                                    83-85 Thái Hà, Trung Liệt, Đống Đa, Hà Nội
                                                 </Paragraph>
                                             </Space>
                                             <Space align="start">
@@ -366,7 +366,7 @@ function Contact() {
                                             <Space align="start">
                                                 <EnvironmentOutlined />
                                                 <Paragraph style={{ margin: 0 }}>
-                                                    Số 83A Nhuệ Giang, Quận 10, TP Hồ Chí Minh
+                                                    40 Vĩnh Viễn, Phường 2, Quận 10, TP Hồ Chí Minh
                                                 </Paragraph>
                                             </Space>
                                             <Space align="start">
@@ -385,7 +385,23 @@ function Contact() {
                                     <Space direction="vertical" style={{ width: '100%' }}>
                                         <Space align="start">
                                             <MailOutlined />
-                                            <Text>longnguyen15032@gmail.com</Text>
+                                            <Text>l2team.contact@gmail.com</Text>
+                                        </Space>
+                                        <Space align="start">
+                                            <FacebookOutlined />
+                                            <a
+                                                href="https://www.facebook.com/pcmarket.vn"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                facebook.com/pcmarket.vn
+                                            </a>
+                                        </Space>
+                                        <Space align="start">
+                                            <EnvironmentOutlined />
+                                            <a href="https://pcmarket.vn/" target="_blank" rel="noopener noreferrer">
+                                                pcmarket.vn
+                                            </a>
                                         </Space>
                                     </Space>
                                 </div>
