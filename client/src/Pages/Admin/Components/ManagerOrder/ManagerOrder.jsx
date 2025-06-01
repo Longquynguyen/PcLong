@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Tag, Space, Button, Modal, Descriptions, Select, Image, message } from 'antd';
+import { Table, Tag, Space, Button, Modal, Descriptions, Select, Image, message, DatePicker, Row, Col } from 'antd';
 import classNames from 'classnames/bind';
 import styles from './ManagerOrder.module.scss';
 import { requestGetOrderAdmin, requestUpdateOrderStatus } from '../../../../config/request';
 
+import dayjs from 'dayjs';
+
 const cx = classNames.bind(styles);
+const { RangePicker } = DatePicker;
 
 function ManagerOrder() {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [dateRange, setDateRange] = useState(null);
 
     // Fetch orders data when component mounts
     useEffect(() => {
@@ -21,7 +26,6 @@ function ManagerOrder() {
         try {
             setLoading(true);
             const response = await requestGetOrderAdmin();
-
             setOrders(response.metadata);
         } catch (error) {
             console.error('Error fetching orders:', error);
@@ -71,6 +75,35 @@ function ManagerOrder() {
         return statusText[status.toLowerCase()];
     };
 
+    const handleFilterChange = (type, value) => {
+        if (type === 'status') {
+            setStatusFilter(value);
+        } else if (type === 'date') {
+            setDateRange(value);
+        }
+    };
+
+    const getFilteredOrders = () => {
+        let filteredOrders = [...orders];
+
+        // Filter by status
+        if (statusFilter !== 'all') {
+            filteredOrders = filteredOrders.filter((order) => order.status === statusFilter);
+        }
+
+        // Filter by date range
+        if (dateRange && dateRange[0] && dateRange[1]) {
+            const startDate = dateRange[0].startOf('day');
+            const endDate = dateRange[1].endOf('day');
+            filteredOrders = filteredOrders.filter((order) => {
+                const orderDate = dayjs(order.createdAt);
+                return orderDate.isAfter(startDate) && orderDate.isBefore(endDate);
+            });
+        }
+
+        return filteredOrders;
+    };
+
     const columns = [
         {
             title: 'Mã đơn hàng',
@@ -89,13 +122,6 @@ function ManagerOrder() {
             dataIndex: 'phone',
             key: 'phone',
             width: '12%',
-        },
-        {
-            title: 'Số lượng',
-            dataIndex: 'quantity',
-            key: 'quantity',
-            width: '8%',
-            align: 'center',
         },
         {
             title: 'Tổng tiền',
@@ -185,10 +211,38 @@ function ManagerOrder() {
                 <h2 className={cx('title')}>Quản lý đơn hàng</h2>
             </div>
 
+            <div className={cx('filters')}>
+                <Row gutter={16}>
+                    <Col span={8}>
+                        <Select
+                            style={{ width: '100%' }}
+                            placeholder="Lọc theo trạng thái"
+                            value={statusFilter}
+                            onChange={(value) => handleFilterChange('status', value)}
+                        >
+                            <Select.Option value="all">Tất cả trạng thái</Select.Option>
+                            <Select.Option value="pending">Chờ xử lý</Select.Option>
+                            <Select.Option value="completed">Đã xử lý</Select.Option>
+                            <Select.Option value="delivered">Đã giao hàng</Select.Option>
+                            <Select.Option value="cancelled">Đã hủy</Select.Option>
+                        </Select>
+                    </Col>
+                    <Col span={8}>
+                        <RangePicker
+                            style={{ width: '100%' }}
+                            placeholder={['Từ ngày', 'Đến ngày']}
+                            value={dateRange}
+                            onChange={(value) => handleFilterChange('date', value)}
+                            format="DD/MM/YYYY"
+                        />
+                    </Col>
+                </Row>
+            </div>
+
             <div className={cx('content')}>
                 <Table
                     columns={columns}
-                    dataSource={orders}
+                    dataSource={getFilteredOrders()}
                     rowKey="id"
                     pagination={{
                         pageSize: 10,
@@ -222,15 +276,15 @@ function ManagerOrder() {
                                             style={{ objectFit: 'cover' }}
                                         />
                                         <div>{product.name}</div>
-                                        <div>Màu: {product.color}</div>
-                                        <div>Size: {product.size}</div>
                                         <div>Số lượng: {product.quantity}</div>
                                         <div>Giá: {product.price.toLocaleString('vi-VN')}đ</div>
                                     </Space>
                                 ))}
                             </Space>
                         </Descriptions.Item>
-                        <Descriptions.Item label="Số lượng">{selectedOrder.quantity}</Descriptions.Item>
+                        <Descriptions.Item label="Ngày đặt hàng">
+                            {dayjs(selectedOrder.createdAt).format('HH:mm DD/MM/YYYY')}
+                        </Descriptions.Item>
                         <Descriptions.Item label="Khách hàng">{selectedOrder.fullName}</Descriptions.Item>
                         <Descriptions.Item label="Số điện thoại">{selectedOrder.phone}</Descriptions.Item>
                         <Descriptions.Item label="Địa chỉ">{selectedOrder.address}</Descriptions.Item>
